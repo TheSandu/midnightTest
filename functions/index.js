@@ -3,7 +3,7 @@ const fetch = require("node-fetch");
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
-const { validateEmail } = require("./utils");
+const { validateEmail, getToken, getDataFromToken } = require("./utils");
 const config = require("./config.json");
 const serviceAccount = require('./serviceAccountKey.json');
 
@@ -47,6 +47,30 @@ exports.register = functions.https.onRequest(async (request, response) => {
     response.status(500).send( `Success: UserId ${userRef.id}` );
 });
 
+exports.login = functions.https.onRequest(async (request, response) => {
+
+    // if( request.method !== "POST") {
+    //     response.status(403).send('LoginService Error: Bad request');
+    //     return;
+    // }
+
+    let { username, password } = request.body;
+
+    // if( username === undefined || password === undefined ) {
+    //     response.status(403).send('LoginService Error: No username of password');
+    //     return;
+    // }
+
+    let token = await getToken({username: username, password: password});
+
+    console.log( token );
+
+    let data = await getDataFromToken( token );
+
+    console.log( data );
+
+    response.status(500).send( `Success:` );
+});
 
 // Can be some issues with functions becouse of proxy server, can test it fast sorry
 exports.userData = functions.https.onRequest(async (request, response) => {
