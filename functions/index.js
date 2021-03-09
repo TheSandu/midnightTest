@@ -16,19 +16,19 @@ const db = admin.firestore();
 exports.register = functions.https.onRequest(async (request, response) => {
 
     if( request.method !== "POST") {
-        response.status(403).send('RegisterService Error: Bad request');
+        response.status(403).json({status:"Error", message: 'RegisterService Error: Bad request'});
         return;
     }
 
     let { username, password, name, email } = request.body;
 
     if( username === undefined || password === undefined || name === undefined || email === undefined ) {
-        response.status(403).send('RegisterService Error: No data');
+        response.status(403).json({status:"Error", message: 'RegisterService Error: No data'});
         return;
     }
 
     if( !validateEmail( email ) ) {
-        response.status(403).send('RegisterService Error: Bad email');
+        response.status(403).json({status:"Error", message: 'RegisterService Error: Bad email'});
         return;
     }
 
@@ -40,36 +40,41 @@ exports.register = functions.https.onRequest(async (request, response) => {
     });
 
     if( !userRef.id ) {
-        response.status(403).send('RegisterService Error: User not added');
+        response.status(403).json({status:"Error", message: 'RegisterService Error: User not added'});
         return;
     }
 
-    response.status(500).send( `Success: UserId ${userRef.id}` );
+    response.status(500).json({status: "Success", message: `Success: UserId ${userRef.id}`});
 });
 
 exports.login = functions.https.onRequest(async (request, response) => {
 
-    // if( request.method !== "POST") {
-    //     response.status(403).send('LoginService Error: Bad request');
-    //     return;
-    // }
+    if( request.method !== "POST") {
+        response.status(403).json({status:"Error", message: 'LoginService Error: Bad request'});
+        return;
+    }
 
-    let { username, password } = request.body;
+    let token = request.headers['authorization'];
 
-    // if( username === undefined || password === undefined ) {
-    //     response.status(403).send('LoginService Error: No username of password');
-    //     return;
-    // }
+    let { username, password } = token ? await getDataFromToken( token ) : request.body;
 
-    let token = await getToken({username: username, password: password});
+    if( username === undefined || password === undefined ) {
+        response.status(403).json({status:"Error", message: 'LoginService Error: No username of password'});
+        return;
+    }
 
-    console.log( token );
+    const usersRef = db.collection('users');
+    const usersSnapshot = await usersRef.where('username', '==', username)
+                                        .where('password', '==', password).limit(1).get();
 
-    let data = await getDataFromToken( token );
+    if (usersSnapshot.empty) {
+        response.status(403).json({status:"Error", message: 'LoginService Error: User not found'});
+        return;
+    }
 
-    console.log( data );
+    let user = usersSnapshot.docs.pop().data();
 
-    response.status(500).send( `Success:` );
+    response.status(500).json({status:"Succes", user: user});
 });
 
 // Can be some issues with functions becouse of proxy server, can test it fast sorry
@@ -78,7 +83,7 @@ exports.userData = functions.https.onRequest(async (request, response) => {
     const ip = request.headers['x-forwarded-for'] || request.connection.remoteAddress;
 
     if( !ip ) {
-        response.status(403).send('UserDataService Error: Ip undefined');
+        response.status(403).json({status:"Error", message: 'UserDataService Error: Ip undefined'});
         return;
     }
 
@@ -86,9 +91,9 @@ exports.userData = functions.https.onRequest(async (request, response) => {
     const data = await userInfo.json();
 
     if( data.hasOwnProperty('code') && data.code !== 500 ) {
-        response.status(403).send(`UserDataService Error: ${data.messages}`);
+        response.status(403).json({status:"Error", message: `UserDataService Error: ${data.messages}`});
         return;
     }
 
-    response.status(500).json( data );
+    response.status(500).json({status:"Success", ...data});
 });
